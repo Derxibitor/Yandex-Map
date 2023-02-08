@@ -1,0 +1,52 @@
+body {
+  margin: 0;
+}
+
+.wrapper  {
+  width: 100vw;
+  height: 100vh;
+}
+
+.modal  {
+  background-color: white;
+  position: absolute;
+  width: 450px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.triangle {
+  background-color: white;
+  width: 20px;
+  height: 20px;
+  position: absolute;
+  rotate: 45deg;
+  bottom: -10px;
+}
+
+input {
+  display: block;
+  margin-bottom: 20px;
+  height: 20px;
+  width: 350px; 
+}
+
+button {
+  margin-bottom: 30px;
+}
+
+.hide {
+  display: none;
+}
+
+.textarea {
+  resize: none;
+  width: 350px; 
+  height: 50px;
+  margin-bottom: 20px;
+}
