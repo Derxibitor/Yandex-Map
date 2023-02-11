@@ -1,64 +1,97 @@
-let reviews = []
+const formTemplate = `
+  <form id="add-form">
+    <h2>Отзыв</h2>
+    <input type="text" placeholder="название места" name="place">
+    <input type="text" placeholder="Ваше имя" name="author">
+    <textarea class="textarea" placeholder="Ваш отзыв" name="review"></textarea>
+    <button id="add-btn">Добавить</button><br>
+  </form>
+`;
 
-let myMap;
+let clusterer
 
-const init = () => {
-    myMap = new ymaps.Map("map", {
-        center: [55.76, 37.64],
-        zoom: 13
-    }, {
-      balloonMaxWidth: 400,
-      searchControlProvider: 'yandex#search'
+document.addEventListener('DOMContentLoaded', () => {
+  ymaps.ready(init);
+  function init() {
+    const myMap = new ymaps.Map('map', {
+      center: [55.76, 37.64],
+      controls: ['zoomControl'],
+      zoom: 12,
     });
 
-    const marks = []
+    myMap.events.add('click', async function (e) {
+      const coords = e.get('coords');
+      openBalloon(myMap, coords, []);
+    });
 
-    // setInterval(() => {
-    //   console.log(marks)
-    // }, 3000)
+    clusterer = new ymaps.Clusterer({ clusterDisableClickZoom: true });
+    clusterer.options.set('hasBalloon', false);
 
-    const myCollection = new ymaps.GeoObjectCollection({}, {
-        draggable: false,
-        iconLayout: 'default#image',
-        iconImageSize: [46,57],
-        iconImageOffset: [-35,-52],
+    getGeoObjects(myMap)
+    clusterer.events.add('click', function(e) {
+      let geoObjectsInCluster = e.get('target').getGeoObjects()
+      openBalloon(myMap, e.get('coords'), geoObjectsInCluster)
     })
 
-    // marks.forEach(coord => {
-    //     myCollection.add(new ymaps.Placemark(coord))
-    // })
+  }
+});
 
-    myMap.geoObjects.add(myCollection)
+function getReviewList(currentGeoObjects) {
+  let reviewListHTML = '';
+  
+  for (const review of getReviewsFromLS()) {
+    if (currentGeoObjects.some(geoObject => JSON.stringify(geoObject.geometry._coordinates) === JSON.stringify(review.coords))) {
+      reviewListHTML += `
+        <div class="review">
+          <div><strong>Место: </strong>${review.place}</div>
+          <div><strong>Имя: </strong>${review.author}</div>
+          <div><strong>Отзыв: </strong>${review.reviewText}</div>
+        </div>  
+      `;
+    }
+  }
+  return reviewListHTML;
+}
 
-    myMap.events.add('click', function (e) {
-      if (!myMap.balloon.isOpen()) {
-          let coords = e.get('coords');
-          myMap.balloon.open(coords, {
-              contentBody: `<h2 class="title">Отзыв:</h2>
-              <input id="nameEl" type="text" placeholder="Укажите ваше имя">
-              <input id="placeEl" type="text" placeholder="Укажите место">
-              <textarea id="textEl" class="textarea" placeholder="Оставьте отзыв"></textarea>
-              <button id="button">Добавить</button>`,
-          });
-          const buttonEl = document.querySelector('#button')
-          const inputName = document.querySelector('#nameEl')
-          const inputPlace = document.querySelector('#placeEl')
-          const inputReview = document.querySelector('#textEl')
-          buttonEl.addEventListener('click', () => {
-            marks.push({
-              mark: coords,
-              name: inputName.value,
-              place: inputPlace.value,
-              review: inputReview.value
-            })
-            myMap.balloon.close();
-          }, { once: true })
-      }
-      else {
-          myMap.balloon.close();
-      }
+function getReviewsFromLS() {
+  const reviews = localStorage.reviews
+  return JSON.parse(reviews || "[]")
+}
+
+function getGeoObjects(map) {
+  const geoObjects = []
+  for (const review of getReviewsFromLS() || []) {
+    const placemark = new ymaps.Placemark(review.coords);
+    placemark.events.add('click', e => {
+      e.stopPropagation();
+      openBalloon(map, e.get('coords'), [e.get('target')])
+    })
+    geoObjects.push(placemark);
+  }
+
+  clusterer.removeAll()
+  map.geoObjects.remove(clusterer)
+  clusterer.add(geoObjects)
+  map.geoObjects.add(clusterer)
+}
+
+async function openBalloon(map, coords, currentGeoObjects) {
+  await map.balloon.open(coords, {
+    content: `<div class="reviews">${getReviewList(currentGeoObjects)}</div>` + formTemplate,
   });
+  document.querySelector('#add-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const review = {
+      coords,
+      author: this.elements.author.value,
+      place: this.elements.place.value,
+      reviewText: this.elements.review.value,
+    };
 
-};
+    localStorage.reviews = JSON.stringify([...getReviewsFromLS(), review])
 
-ymaps.ready(init);
+    getGeoObjects(map)
+
+    map.balloon.close();
+  });
+}
